@@ -13,8 +13,8 @@ def numerical_grad(f, params, param_values, delta=1e-6):
     values = np.zeros(size)
     offset = 0
     for param, value in zip(params, param_values):
-        values[offset:offset + param.size] = value.numpy().flatten()
-        param.value = values[offset:offset + param.size].reshape(param.shape)
+        values[offset: offset + param.size] = value.numpy().flatten()
+        param.value = values[offset: offset + param.size].reshape(param.shape)
         offset += param.size
 
     numgrad = np.zeros(values.shape)
@@ -32,8 +32,7 @@ def numerical_grad(f, params, param_values, delta=1e-6):
     numgrads = []
     offset = 0
     for param in params:
-        numgrads.append(
-            numgrad[offset:offset + param.size].reshape(param.shape))
+        numgrads.append(numgrad[offset: offset + param.size].reshape(param.shape))
         offset += param.size
     return numgrads
 
@@ -59,7 +58,7 @@ class TestCvxpyLayer(unittest.TestCase):
 
         with tf.GradientTape() as tape:
             # solve the problem, setting the values of A and b to A_tf and b_tf
-            solution, = cvxpylayer(A_tf, b_tf)
+            (solution,) = cvxpylayer(A_tf, b_tf)
             summed_solution = tf.math.reduce_sum(solution)
         gradA, gradb = tape.gradient(summed_solution, [A_tf, b_tf])
 
@@ -76,8 +75,8 @@ class TestCvxpyLayer(unittest.TestCase):
         tf.random.set_seed(0)
         nx, ncon = 2, 3
 
-        G = cp.Parameter((ncon, nx), name='G')
-        h = cp.Parameter(ncon, name='h')
+        G = cp.Parameter((ncon, nx), name="G")
+        h = cp.Parameter(ncon, name="h")
         x = cp.Variable(nx)
         obj = cp.Minimize(0.5 * cp.sum_squares(x - 1))
         cons = [G * x <= h]
@@ -92,7 +91,7 @@ class TestCvxpyLayer(unittest.TestCase):
         with tf.GradientTape() as tape:
             tape.watch(G_t)
             tape.watch(h_t)
-            soln = cvxlayer(G_t, h_t, solver_args={'eps': 1e-10})
+            soln = cvxlayer(G_t, h_t, solver_args={"eps": 1e-10})
         soln = {x.name(): soln[0]}
 
         grads = tape.gradient(soln, [G_t, h_t])
@@ -103,8 +102,7 @@ class TestCvxpyLayer(unittest.TestCase):
         h.value = h_t.numpy()
         problem.solve(solver=cp.SCS)
         self.assertEqual(len(soln.values()), len(problem.variables()))
-        np.testing.assert_almost_equal(
-            x.value, list(soln.values())[0], decimal=5)
+        np.testing.assert_almost_equal(x.value, list(soln.values())[0], decimal=5)
 
         def f():
             problem.solve(solver=cp.SCS, eps=1e-10)
@@ -119,8 +117,8 @@ class TestCvxpyLayer(unittest.TestCase):
         tf.random.set_seed(0)
         nx, ncon = 2, 3
 
-        G = cp.Parameter((ncon, nx), name='G')
-        h = cp.Parameter(ncon, name='h')
+        G = cp.Parameter((ncon, nx), name="G")
+        h = cp.Parameter(ncon, name="h")
         x = cp.Variable(nx)
         obj = cp.Minimize(0.5 * cp.sum_squares(x - 1))
         cons = [G * x <= h]
@@ -135,7 +133,7 @@ class TestCvxpyLayer(unittest.TestCase):
         with tf.GradientTape() as tape:
             tape.watch(G_t)
             tape.watch(h_t)
-            soln = cvxlayer(G_t, h_t, solver_args={'eps': 1e-10})
+            soln = cvxlayer(G_t, h_t, solver_args={"eps": 1e-10})
         soln = {x.name(): soln[0]}
 
         grads = tape.gradient(soln, [G_t, h_t])
@@ -146,8 +144,7 @@ class TestCvxpyLayer(unittest.TestCase):
         h.value = h_t.numpy()
         problem.solve(solver=cp.SCS)
         self.assertEqual(len(soln.values()), len(problem.variables()))
-        np.testing.assert_almost_equal(
-            x.value, list(soln.values())[0], decimal=5)
+        np.testing.assert_almost_equal(x.value, list(soln.values())[0], decimal=5)
 
         def f():
             problem.solve(solver=cp.SCS, eps=1e-10)
@@ -162,9 +159,9 @@ class TestCvxpyLayer(unittest.TestCase):
         tf.random.set_seed(0)
         nbtch, nx, ncon = 4, 3, 2
 
-        G = cp.Parameter((ncon, nx), name='G')
-        h = cp.Parameter(ncon, name='h')
-        x = cp.Variable(nx, name='x')
+        G = cp.Parameter((ncon, nx), name="G")
+        h = cp.Parameter(ncon, name="h")
+        x = cp.Variable(nx, name="x")
         obj = cp.Minimize(0.5 * cp.sum_squares(x - 1))
         cons = [G * x <= h]
         problem = cp.Problem(obj, cons)
@@ -178,14 +175,14 @@ class TestCvxpyLayer(unittest.TestCase):
         with tf.GradientTape() as tape:
             tape.watch(G_t)
             tape.watch(h_t)
-            soln = cvxlayer(G_t, h_t, solver_args={'eps': 1e-10})
+            soln = cvxlayer(G_t, h_t, solver_args={"eps": 1e-10})
         soln = {x.name(): soln[0]}
 
         grads = tape.gradient(soln, [G_t, h_t])
         gradG = grads[0]
         gradh = grads[1]
 
-        solns = [tf.squeeze(t).numpy() for t in tf.split(soln['x'], nbtch)]
+        solns = [tf.squeeze(t).numpy() for t in tf.split(soln["x"], nbtch)]
         Gs = [tf.squeeze(t) for t in tf.split(G_t, nbtch)]
         hs = [tf.squeeze(t) for t in tf.split(h_t, nbtch)]
         gradGs = [tf.squeeze(t).numpy() for t in tf.split(gradG, nbtch)]
@@ -225,16 +222,15 @@ class TestCvxpyLayer(unittest.TestCase):
         y = y_np
 
         log_likelihood = cp.sum(
-            cp.multiply(y, X @ a) -
-            cp.log_sum_exp(cp.hstack([np.zeros((N, 1)), X @ a]).T, axis=0,
-                           keepdims=True).T
+            cp.multiply(y, X @ a) - cp.log_sum_exp(
+                cp.hstack([np.zeros((N, 1)), X @ a]).T, axis=0, keepdims=True
+            ).T
         )
-        prob = cp.Problem(
-            cp.Minimize(-log_likelihood + lam * cp.sum_squares(a)))
+        prob = cp.Problem(cp.Minimize(-log_likelihood + lam * cp.sum_squares(a)))
         fit_logreg = CvxpyLayer(prob, [X, lam], [a])
 
         with tf.GradientTape(persistent=True) as tape:
-            weights = fit_logreg(X_tf, lam_tf, solver_args={'eps': 1e-8})[0]
+            weights = fit_logreg(X_tf, lam_tf, solver_args={"eps": 1e-8})[0]
             summed = tf.math.reduce_sum(weights)
         grad_X_tf, grad_lam_tf = tape.gradient(summed, [X_tf, lam_tf])
 
@@ -243,7 +239,8 @@ class TestCvxpyLayer(unittest.TestCase):
             return np.sum(a.value)
 
         numgrad_X_tf, numgrad_lam_tf = numerical_grad(
-            f_train, [X, lam], [X_tf, lam_tf], delta=1e-6)
+            f_train, [X, lam], [X_tf, lam_tf], delta=1e-6
+        )
         np.testing.assert_allclose(grad_X_tf, numgrad_X_tf, atol=1e-2)
         np.testing.assert_allclose(grad_lam_tf, numgrad_lam_tf, atol=1e-2)
 
@@ -264,8 +261,8 @@ class TestCvxpyLayer(unittest.TestCase):
         prob = cp.Problem(cp.Minimize(objective))
         layer = CvxpyLayer(prob, [lam, lam2], [x])
         with self.assertRaisesRegex(
-                ValueError,
-                'A tensor must be provided for each CVXPY parameter.*'):
+            ValueError, "A tensor must be provided for each CVXPY parameter.*"
+        ):
             layer(lam)
 
     def test_non_dpp(self):
@@ -274,7 +271,7 @@ class TestCvxpyLayer(unittest.TestCase):
         lam = cp.Parameter(1)
         objective = lam * cp.norm(x, 1)
         prob = cp.Problem(cp.Minimize(objective))
-        with self.assertRaisesRegex(ValueError, 'Problem must be DPP.'):
+        with self.assertRaisesRegex(ValueError, "Problem must be DPP."):
             CvxpyLayer(prob, [lam], [x, y])  # noqa: F841
 
     def test_too_many_variables(self):
@@ -283,7 +280,7 @@ class TestCvxpyLayer(unittest.TestCase):
         lam = cp.Parameter(1, nonneg=True)
         objective = lam * cp.norm(x, 1)
         prob = cp.Problem(cp.Minimize(objective))
-        with self.assertRaisesRegex(ValueError, 'Argument `variables`.*'):
+        with self.assertRaisesRegex(ValueError, "Argument `variables`.*"):
             CvxpyLayer(prob, [lam], [x, y])  # noqa: F841
 
     def test_infeasible(self):
@@ -300,14 +297,14 @@ class TestCvxpyLayer(unittest.TestCase):
         k = 2
         x = cp.Parameter(4)
         y = cp.Variable(4)
-        obj = -x * y - cp.sum(cp.entr(y)) - cp.sum(cp.entr(1. - y))
+        obj = -x * y - cp.sum(cp.entr(y)) - cp.sum(cp.entr(1.0 - y))
         cons = [cp.sum(y) == k]
         problem = cp.Problem(cp.Minimize(obj), cons)
         lml = CvxpyLayer(problem, [x], [y])
-        x_tf = tf.Variable([1., -1., -1., -1.], dtype=tf.float64)
+        x_tf = tf.Variable([1.0, -1.0, -1.0, -1.0], dtype=tf.float64)
 
         with tf.GradientTape() as tape:
-            y_opt = lml(x_tf, solver_args={'eps': 1e-10})[0]
+            y_opt = lml(x_tf, solver_args={"eps": 1e-10})[0]
             loss = -tf.math.log(y_opt[1])
 
         def f():
@@ -329,24 +326,24 @@ class TestCvxpyLayer(unittest.TestCase):
         b = [cp.Parameter((1, 1)) for _ in range(p)]
 
         C_tf = tf.Variable(tf.random.normal((n, n), dtype=tf.float64))
-        A_tf = [tf.Variable(tf.random.normal((n, n), dtype=tf.float64))
-                for _ in range(p)]
-        b_tf = [tf.Variable(tf.random.normal((1, 1), dtype=tf.float64))
-                for _ in range(p)]
+        A_tf = [
+            tf.Variable(tf.random.normal((n, n), dtype=tf.float64)) for _ in range(p)
+        ]
+        b_tf = [
+            tf.Variable(tf.random.normal((1, 1), dtype=tf.float64)) for _ in range(p)
+        ]
 
         X = cp.Variable((n, n), symmetric=True)
         constraints = [X >> 0]
-        constraints += [
-            cp.trace(A[i]@X) == b[i] for i in range(p)
-        ]
-        problem = cp.Problem(cp.Minimize(
-            cp.trace(C @ X) - cp.log_det(X) + cp.sum_squares(X)),
-            constraints)
+        constraints += [cp.trace(A[i] @ X) == b[i] for i in range(p)]
+        problem = cp.Problem(
+            cp.Minimize(cp.trace(C @ X) - cp.log_det(X) + cp.sum_squares(X)),
+            constraints,
+        )
         layer = CvxpyLayer(problem, [C] + A + b, [X])
         values = [C_tf] + A_tf + b_tf
         with tf.GradientTape() as tape:
-            soln = layer(*values,
-                         solver_args={'eps': 1e-10, 'max_iters': 10000})[0]
+            soln = layer(*values, solver_args={"eps": 1e-10, "max_iters": 10000})[0]
             summed = tf.math.reduce_sum(soln)
         grads = tape.gradient(summed, values)
 
@@ -370,13 +367,12 @@ class TestCvxpyLayer(unittest.TestCase):
         b = cp.Parameter(pos=True, value=1.0)
         c = cp.Parameter(value=0.5)
 
-        objective_fn = 1/(x*y*z)
-        constraints = [a*(x*y + x*z + y*z) <= b, x >= y**c]
+        objective_fn = 1 / (x * y * z)
+        constraints = [a * (x * y + x * z + y * z) <= b, x >= y**c]
         problem = cp.Problem(cp.Minimize(objective_fn), constraints)
         problem.solve(cp.SCS, gp=True, eps=1e-12)
 
-        layer = CvxpyLayer(
-            problem, parameters=[a, b, c], variables=[x, y, z], gp=True)
+        layer = CvxpyLayer(problem, parameters=[a, b, c], variables=[x, y, z], gp=True)
         a_tf = tf.Variable(2.0, dtype=tf.float64)
         b_tf = tf.Variable(1.0, dtype=tf.float64)
         c_tf = tf.Variable(0.5, dtype=tf.float64)
@@ -400,7 +396,7 @@ class TestCvxpyLayer(unittest.TestCase):
         A = cp.Parameter((m, n))
         b = cp.Parameter(m)
         x = cp.Variable(n)
-        obj = cp.sum_squares(A@x - b) + cp.sum_squares(x)
+        obj = cp.sum_squares(A @ x - b) + cp.sum_squares(x)
         prob = cp.Problem(cp.Minimize(obj))
         prob_tf = CvxpyLayer(prob, [A, b], [x])
 
@@ -420,12 +416,12 @@ class TestCvxpyLayer(unittest.TestCase):
         grad_b_lstsq = tf.cast(grad_b_lstsq, tf.float64)
 
         self.assertAlmostEqual(
-            tf.linalg.norm(grad_A_cvxpy / n_batch - grad_A_lstsq).numpy(),
-            0.0, places=2)
+            tf.linalg.norm(grad_A_cvxpy / n_batch - grad_A_lstsq).numpy(), 0.0, places=2
+        )
         self.assertAlmostEqual(
-            tf.linalg.norm(grad_b_cvxpy[0] - grad_b_lstsq).numpy(), 0.0,
-            places=2)
+            tf.linalg.norm(grad_b_cvxpy[0] - grad_b_lstsq).numpy(), 0.0, places=2
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

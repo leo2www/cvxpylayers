@@ -1,20 +1,23 @@
 import cvxpy as cp
-from cvxpy.reductions.solvers.conic_solvers.scs_conif import \
-    dims_to_solver_dict
+from cvxpy.reductions.solvers.conic_solvers.scs_conif import dims_to_solver_dict
 import diffcp
 import numpy as np
 
 try:
     import tensorflow as tf
 except ImportError:
-    raise ImportError("Unable to import tensorflow. Please install "
-                      "TensorFlow >= 2.0 (https://tensorflow.org).")
+    raise ImportError(
+        "Unable to import tensorflow. Please install "
+        "TensorFlow >= 2.0 (https://tensorflow.org)."
+    )
 
-tf_major_version = int(tf.__version__.split('.')[0])
+tf_major_version = int(tf.__version__.split(".")[0])
 if tf_major_version < 2:
-    raise ImportError("cvxpylayers requires TensorFlow >= 2.0; please "
-                      "upgrade your installation of TensorFlow, which is "
-                      "version %s." % tf.__version__)
+    raise ImportError(
+        "cvxpylayers requires TensorFlow >= 2.0; please "
+        "upgrade your installation of TensorFlow, which is "
+        "version %s." % tf.__version__
+    )
 
 
 class CvxpyLayer(object):
@@ -70,39 +73,42 @@ class CvxpyLayer(object):
         """
         if gp:
             if not problem.is_dgp(dpp=True):
-                raise ValueError('Problem must be DPP.')
+                raise ValueError("Problem must be DPP.")
         else:
             if not problem.is_dcp(dpp=True):
-                raise ValueError('Problem must be DPP.')
+                raise ValueError("Problem must be DPP.")
         if set(parameters) != set(problem.parameters()):
-            raise ValueError("The layer's parameters must exactly match "
-                             "problem.parameters")
+            raise ValueError(
+                "The layer's parameters must exactly match " "problem.parameters"
+            )
         if not set(variables).issubset(set(problem.variables())):
-            raise ValueError('Argument `variables` must be a subset of '
-                             '`problem.variables()`')
+            raise ValueError(
+                "Argument `variables` must be a subset of " "`problem.variables()`"
+            )
         self.params = parameters
         self.gp = gp
 
         if self.gp:
             for param in parameters:
                 if param.value is None:
-                    raise ValueError("An initial value for each parameter is "
-                                     "required when gp=True.")
-            data, solving_chain, _ = (
-                problem.get_problem_data(
-                    solver=cp.SCS, gp=True,
-                    solver_opts={'use_quad_obj': False}
-            ))
+                    raise ValueError(
+                        "An initial value for each parameter is "
+                        "required when gp=True."
+                    )
+            data, solving_chain, _ = problem.get_problem_data(
+                solver=cp.SCS, gp=True, solver_opts={"use_quad_obj": False}
+            )
             self.asa_maps = data[cp.settings.PARAM_PROB]
             self.dgp2dcp = solving_chain.get(cp.reductions.Dgp2Dcp)
             self.param_ids = [p.id for p in self.asa_maps.parameters]
         else:
             data, _, _ = problem.get_problem_data(
-                solver=cp.SCS, solver_opts={'use_quad_obj': False})
+                solver=cp.SCS, solver_opts={"use_quad_obj": False}
+            )
             self.asa_maps = data[cp.settings.PARAM_PROB]
             self.param_ids = [p.id for p in self.params]
 
-        self.cones = dims_to_solver_dict(data['dims'])
+        self.cones = dims_to_solver_dict(data["dims"])
         self.vars = variables
 
     def __call__(self, *parameters, solver_args={}):
@@ -121,11 +127,14 @@ class CvxpyLayer(object):
           supplied to the constructor.
         """
         if len(parameters) != len(self.params):
-            raise ValueError('A tensor must be provided for each CVXPY '
-                             'parameter; received %d tensors, expected %d' % (
-                                 len(parameters), len(self.params)))
+            raise ValueError(
+                "A tensor must be provided for each CVXPY "
+                "parameter; received %d tensors, expected %d"
+                % (len(parameters), len(self.params))
+            )
         compute = tf.custom_gradient(
-            lambda *parameters: self._compute(parameters, solver_args))
+            lambda *parameters: self._compute(parameters, solver_args)
+        )
         return compute(*parameters)
 
     def _dx_from_dsoln(self, dsoln):
@@ -137,7 +146,8 @@ class CvxpyLayer(object):
 
     def _problem_data_from_params(self, params):
         c, _, A, b = self.asa_maps.apply_parameters(
-            dict(zip(self.param_ids, params)), keep_zeros=True)
+            dict(zip(self.param_ids, params)), keep_zeros=True
+        )
         A = -A
         return A, b, c
 
@@ -170,14 +180,16 @@ class CvxpyLayer(object):
                     raise ValueError(
                         "Invalid parameter size passed in. "
                         "Parameter {} appears to be batched, but the leading "
-                        "dimension is 0".format(i))
+                        "dimension is 0".format(i)
+                    )
             else:
                 raise ValueError(
                     "Invalid parameter size passed in. Expected "
                     "parameter {} to have have {} or {} dimensions "
                     "but got {} dimensions".format(
-                        i, p_signature.ndim, p_signature.ndim + 1,
-                        p_in.ndim))
+                        i, p_signature.ndim, p_signature.ndim + 1, p_in.ndim
+                    )
+                )
             batch_sizes.append(batch_size)
 
             # validate the parameter shape
@@ -186,10 +198,8 @@ class CvxpyLayer(object):
                 raise ValueError(
                     "Inconsistent parameter shapes passed in. "
                     "Expected parameter {} to have non-batched shape of "
-                    "{} but got {}.".format(
-                            i,
-                            p_signature.shape,
-                            p_signature.shape))
+                    "{} but got {}.".format(i, p_signature.shape, p_signature.shape)
+                )
 
         batch_sizes = np.array(batch_sizes)
         any_batched = np.any(batch_sizes > 0)
@@ -201,7 +211,8 @@ class CvxpyLayer(object):
                 raise ValueError(
                     "Inconsistent batch sizes passed in. Expected "
                     "parameters to have no batch size or all the same "
-                    "batch size but got sizes: {}.".format(batch_sizes))
+                    "batch size but got sizes: {}.".format(batch_sizes)
+                )
         else:
             batch_size = 1
 
@@ -220,8 +231,7 @@ class CvxpyLayer(object):
 
         As, bs, cs = [], [], []
         for i in range(batch_size):
-            params_i = [
-                p if sz == 0 else p[i] for p, sz in zip(params, batch_sizes)]
+            params_i = [p if sz == 0 else p[i] for p, sz in zip(params, batch_sizes)]
             A, b, c = self._problem_data_from_params(params_i)
             As.append(A)
             bs.append(b)
@@ -229,21 +239,21 @@ class CvxpyLayer(object):
 
         try:
             xs, _, ss, _, DT = diffcp.solve_and_derivative_batch(
-                As=As, bs=bs, cs=cs, cone_dicts=[self.cones] * batch_size,
-                **solver_args)
+                As=As, bs=bs, cs=cs, cone_dicts=[self.cones] * batch_size, **solver_args
+            )
         except diffcp.SolverError as e:
             print(
                 "Please consider re-formulating your problem so that "
                 "it is always solvable or increasing the number of "
-                "solver iterations.")
+                "solver iterations."
+            )
             raise e
 
         DT = self._restrict_DT_to_dx(DT, batch_size, ss[0].shape)
         solns = [self._split_solution(x) for x in xs]
         # soln[i] is a tensor with first dimension equal to batch_size, holding
         # the optimal values for variable i
-        solution = [
-            tf.stack([s[i] for s in solns]) for i in range(len(self.vars))]
+        solution = [tf.stack([s[i] for s in solns]) for i in range(len(self.vars))]
         if not any_batched:
             solution = [tf.squeeze(s, 0) for s in solution]
 
@@ -252,7 +262,7 @@ class CvxpyLayer(object):
 
         def gradient_function(*dsoln):
             if self.gp:
-                dsoln = [dsoln*s for dsoln, s in zip(dsoln, solution)]
+                dsoln = [dsoln * s for dsoln, s in zip(dsoln, solution)]
 
             if not any_batched:
                 dsoln = [tf.expand_dims(dvar, 0) for dvar in dsoln]
@@ -264,16 +274,15 @@ class CvxpyLayer(object):
                 tensors = tf.split(value, batch_size)
                 for dsoln_list, t in zip(dsoln_lists, tensors):
                     dsoln_list.append(tf.squeeze(t))
-            dxs = [self._dx_from_dsoln(dsoln_list)
-                   for dsoln_list in dsoln_lists]
+            dxs = [self._dx_from_dsoln(dsoln_list) for dsoln_list in dsoln_lists]
             dAs, dbs, dcs = DT(dxs)
             dparams_dict_unbatched = [
-                self.asa_maps.apply_param_jac(dc, -dA, db) for
-                (dA, db, dc) in zip(dAs, dbs, dcs)]
+                self.asa_maps.apply_param_jac(dc, -dA, db)
+                for (dA, db, dc) in zip(dAs, dbs, dcs)
+            ]
             dparams = []
             for pid in self.param_ids:
-                dparams.append(
-                    tf.constant([d[pid] for d in dparams_dict_unbatched]))
+                dparams.append(tf.constant([d[pid] for d in dparams_dict_unbatched]))
 
             if not any_batched:
                 dparams = tuple(tf.squeeze(dparam, 0) for dparam in dparams)
@@ -287,9 +296,7 @@ class CvxpyLayer(object):
                 dcp_dparams = dparams
                 dparams = []
                 grads = {pid: g for pid, g in zip(self.param_ids, dcp_dparams)}
-                old_params_to_new_params = (
-                    self.dgp2dcp.canon_methods._parameters
-                )
+                old_params_to_new_params = self.dgp2dcp.canon_methods._parameters
                 for param, value in zip(self.params, tf_params):
                     g = 0.0 if param.id not in grads else grads[param.id]
                     if param in old_params_to_new_params:

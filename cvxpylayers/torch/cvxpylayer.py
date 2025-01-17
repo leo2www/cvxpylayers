@@ -1,23 +1,27 @@
-import diffcp
-import time
 import cvxpy as cp
-from cvxpy.reductions.solvers.conic_solvers.scs_conif import \
-    dims_to_solver_dict
+from cvxpy.reductions.solvers.conic_solvers.scs_conif import dims_to_solver_dict
 import numpy as np
-from cvxpylayers.utils import \
-    ForwardContext, BackwardContext, forward_numpy, backward_numpy
+from cvxpylayers.utils import (
+    ForwardContext,
+    BackwardContext,
+    forward_numpy,
+    backward_numpy,
+)
 
 try:
     import torch
 except ImportError:
-    raise ImportError("Unable to import torch. Please install at "
-                      "https://pytorch.org.")
+    raise ImportError(
+        "Unable to import torch. Please install at " "https://pytorch.org."
+    )
 
-torch_major_version = int(torch.__version__.split('.')[0])
+torch_major_version = int(torch.__version__.split(".")[0])
 if torch_major_version < 1:
-    raise ImportError("cvxpylayers requires PyTorch >= 1.0; please "
-                      "upgrade your installation of PyTorch, which is "
-                      "version %s." % torch.__version__)
+    raise ImportError(
+        "cvxpylayers requires PyTorch >= 1.0; please "
+        "upgrade your installation of PyTorch, which is "
+        "version %s." % torch.__version__
+    )
 
 
 class CvxpyLayer(torch.nn.Module):
@@ -73,34 +77,37 @@ class CvxpyLayer(torch.nn.Module):
                       backward pass.
         """
         super(CvxpyLayer, self).__init__()
-        
+
         if custom_method is None:
-            self._forward_numpy, self._backward_numpy = forward_numpy, backward_numpy
+            self._forward_numpy, self._backward_numpy = (forward_numpy,)
+            backward_numpy
         else:
             self._forward_numpy, self._backward_numpy = custom_method
 
         self.gp = gp
         if self.gp:
             if not problem.is_dgp(dpp=True):
-                raise ValueError('Problem must be DPP.')
+                raise ValueError("Problem must be DPP.")
         else:
             if not problem.is_dcp(dpp=True):
-                raise ValueError('Problem must be DPP.')
+                raise ValueError("Problem must be DPP.")
 
         if not set(problem.parameters()) == set(parameters):
-            raise ValueError("The layer's parameters must exactly match "
-                             "problem.parameters")
+            raise ValueError(
+                "The layer's parameters must exactly match " "problem.parameters"
+            )
         if not set(variables).issubset(set(problem.variables())):
-            raise ValueError("Argument variables must be a subset of "
-                             "problem.variables")
-        if not isinstance(parameters, list) and \
-           not isinstance(parameters, tuple):
-            raise ValueError("The layer's parameters must be provided as "
-                             "a list or tuple")
-        if not isinstance(variables, list) and \
-           not isinstance(variables, tuple):
-            raise ValueError("The layer's variables must be provided as "
-                             "a list or tuple")
+            raise ValueError(
+                "Argument variables must be a subset of " "problem.variables"
+            )
+        if not isinstance(parameters, list) and not isinstance(parameters, tuple):
+            raise ValueError(
+                "The layer's parameters must be provided as " "a list or tuple"
+            )
+        if not isinstance(variables, list) and not isinstance(variables, tuple):
+            raise ValueError(
+                "The layer's variables must be provided as " "a list or tuple"
+            )
 
         self.param_order = parameters
         self.variables = variables
@@ -112,16 +119,20 @@ class CvxpyLayer(torch.nn.Module):
         if self.gp:
             for param in parameters:
                 if param.value is None:
-                    raise ValueError("An initial value for each parameter is "
-                                     "required when gp=True.")
+                    raise ValueError(
+                        "An initial value for each parameter is "
+                        "required when gp=True."
+                    )
             data, solving_chain, _ = problem.get_problem_data(
-                solver=cp.SCS, gp=True, solver_opts={'use_quad_obj': False})
+                solver=cp.SCS, gp=True, solver_opts={"use_quad_obj": False}
+            )
             self.compiler = data[cp.settings.PARAM_PROB]
             self.dgp2dcp = solving_chain.get(cp.reductions.Dgp2Dcp)
             self.param_ids = [p.id for p in self.compiler.parameters]
         else:
             data, _, _ = problem.get_problem_data(
-                solver=cp.SCS, solver_opts={'use_quad_obj': False})
+                solver=cp.SCS, solver_opts={"use_quad_obj": False}
+            )
             self.compiler = data[cp.settings.PARAM_PROB]
             self.param_ids = [p.id for p in self.param_order]
         self.cone_dims = dims_to_solver_dict(data["dims"])
@@ -143,9 +154,11 @@ class CvxpyLayer(torch.nn.Module):
           supplied to the constructor.
         """
         if len(params) != len(self.param_ids):
-            raise ValueError('A tensor must be provided for each CVXPY '
-                             'parameter; received %d tensors, expected %d' % (
-                                 len(params), len(self.param_ids)))
+            raise ValueError(
+                "A tensor must be provided for each CVXPY "
+                "parameter; received %d tensors, expected %d"
+                % (len(params), len(self.param_ids))
+            )
         info = {}
         f = _CvxpyLayerFn(
             _forward_numpy=self._forward_numpy,
@@ -177,18 +190,19 @@ def to_torch(x, dtype, device):
 
 
 def _CvxpyLayerFn(
-        _forward_numpy,
-        _backward_numpy,
-        param_order,
-        param_ids,
-        variables,
-        var_dict,
-        compiler,
-        cone_dims,
-        gp,
-        dgp2dcp,
-        solver_args,
-        info):
+    _forward_numpy,
+    _backward_numpy,
+    param_order,
+    param_ids,
+    variables,
+    var_dict,
+    compiler,
+    cone_dims,
+    gp,
+    dgp2dcp,
+    solver_args,
+    info,
+):
     class _CvxpyLayerFnFn(torch.autograd.Function):
         @staticmethod
         def forward(ctx, *params):
@@ -203,15 +217,13 @@ def _CvxpyLayerFn(
                     raise ValueError(
                         "Two or more parameters have different dtypes. "
                         "Expected parameter %d to have dtype %s but "
-                        "got dtype %s." %
-                        (i, str(ctx.dtype), str(p.dtype))
+                        "got dtype %s." % (i, str(ctx.dtype), str(p.dtype))
                     )
                 if p.device != ctx.device:
                     raise ValueError(
                         "Two or more parameters are on different devices. "
                         "Expected parameter %d to be on device %s "
-                        "but got device %s." %
-                        (i, str(ctx.device), str(p.device))
+                        "but got device %s." % (i, str(ctx.device), str(p.device))
                     )
 
                 # check and extract the batch size for the parameter
@@ -224,13 +236,16 @@ def _CvxpyLayerFn(
                     if batch_size == 0:
                         raise ValueError(
                             "The batch dimension for parameter {} is zero "
-                            "but should be non-zero.".format(i))
+                            "but should be non-zero.".format(i)
+                        )
                 else:
                     raise ValueError(
                         "Invalid parameter size passed in. Expected "
                         "parameter {} to have have {} or {} dimensions "
                         "but got {} dimensions".format(
-                            i, q.ndim, q.ndim + 1, p.ndimension()))
+                            i, q.ndim, q.ndim + 1, p.ndimension()
+                        )
+                    )
 
                 ctx.batch_sizes.append(batch_size)
 
@@ -240,10 +255,8 @@ def _CvxpyLayerFn(
                     raise ValueError(
                         "Inconsistent parameter shapes passed in. "
                         "Expected parameter {} to have non-batched shape of "
-                        "{} but got {}.".format(
-                                i,
-                                q.shape,
-                                p.shape))
+                        "{} but got {}.".format(i, q.shape, p.shape)
+                    )
 
             ctx.batch_sizes = np.array(ctx.batch_sizes)
             ctx.batch = np.any(ctx.batch_sizes > 0)
@@ -255,20 +268,18 @@ def _CvxpyLayerFn(
                     raise ValueError(
                         "Inconsistent batch sizes passed in. Expected "
                         "parameters to have no batch size or all the same "
-                        "batch size but got sizes: {}.".format(
-                            ctx.batch_sizes))
+                        "batch size but got sizes: {}.".format(ctx.batch_sizes)
+                    )
             else:
                 ctx.batch_size = 1
 
             if gp:
                 ctx.params = params
-                ctx.old_params_to_new_params = (
-                    dgp2dcp.canon_methods._parameters
-                )
-            
+                ctx.old_params_to_new_params = dgp2dcp.canon_methods._parameters
+
             # convert to numpy arrays
             params_numpy = [to_numpy(p) for p in params]
-            
+
             context = ForwardContext(
                 gp=gp,
                 solve_and_derivative=any(p.requires_grad for p in params),
@@ -284,9 +295,9 @@ def _CvxpyLayerFn(
                 variables=variables,
                 var_dict=var_dict,
             )
-            
+
             sol, info_forward = _forward_numpy(params_numpy, context)
-            
+
             # convert to torch tensors and incorporate info_forward
             sol = [to_torch(s, ctx.dtype, ctx.device) for s in sol]
             info.update(info_forward)
@@ -295,10 +306,10 @@ def _CvxpyLayerFn(
 
         @staticmethod
         def backward(ctx, *dvars):
-            
+
             # convert to numpy arrays
             dvars_numpy = [to_numpy(dvar) for dvar in dvars]
-                
+
             context = BackwardContext(
                 info=info,
                 gp=gp,
@@ -311,11 +322,11 @@ def _CvxpyLayerFn(
                 param_order=param_order if gp else None,
                 params=ctx.params if gp else None,
                 old_params_to_new_params=ctx.old_params_to_new_params if gp else None,
-                sol=info['sol'] if gp else None,
+                sol=info["sol"] if gp else None,
             )
 
             grad_numpy, info_backward = _backward_numpy(dvars_numpy, context)
-            
+
             # convert to torch tensors and incorporate info_backward
             grad = [to_torch(g, ctx.dtype, ctx.device) for g in grad_numpy]
             info.update(info_backward)

@@ -1,18 +1,22 @@
 import diffcp
 import cvxpy as cp
-from cvxpy.reductions.solvers.conic_solvers.scs_conif import \
-    dims_to_solver_dict
+from cvxpy.reductions.solvers.conic_solvers.scs_conif import dims_to_solver_dict
 import numpy as np
 import time
 from functools import partial
-from cvxpylayers.utils import \
-    ForwardContext, BackwardContext, forward_numpy, backward_numpy
+from cvxpylayers.utils import (
+    ForwardContext,
+    BackwardContext,
+    forward_numpy,
+    backward_numpy,
+)
 
 try:
     import jax
 except ImportError:
-    raise ImportError("Unable to import jax. Please install from "
-                      "https://github.com/google/jax")
+    raise ImportError(
+        "Unable to import jax. Please install from " "https://github.com/google/jax"
+    )
 from jax import core
 import jax.numpy as jnp
 
@@ -36,7 +40,7 @@ def CvxpyLayer(problem, parameters, variables, gp=False, custom_method=None):
     Returns:
         A callable that solves the problem.
     """
-    
+
     if custom_method is None:
         _forward_numpy, _backward_numpy = forward_numpy, backward_numpy
     else:
@@ -44,25 +48,23 @@ def CvxpyLayer(problem, parameters, variables, gp=False, custom_method=None):
 
     if gp:
         if not problem.is_dgp(dpp=True):
-            raise ValueError('Problem must be DPP.')
+            raise ValueError("Problem must be DPP.")
     else:
         if not problem.is_dcp(dpp=True):
-            raise ValueError('Problem must be DPP.')
+            raise ValueError("Problem must be DPP.")
 
     if not set(problem.parameters()) == set(parameters):
-        raise ValueError("The layer's parameters must exactly match "
-                         "problem.parameters")
+        raise ValueError(
+            "The layer's parameters must exactly match " "problem.parameters"
+        )
     if not set(variables).issubset(set(problem.variables())):
-        raise ValueError("Argument variables must be a subset of "
-                         "problem.variables")
-    if not isinstance(parameters, list) and \
-            not isinstance(parameters, tuple):
-        raise ValueError("The layer's parameters must be provided as "
-                         "a list or tuple")
-    if not isinstance(variables, list) and \
-            not isinstance(variables, tuple):
-        raise ValueError("The layer's variables must be provided as "
-                         "a list or tuple")
+        raise ValueError("Argument variables must be a subset of " "problem.variables")
+    if not isinstance(parameters, list) and not isinstance(parameters, tuple):
+        raise ValueError(
+            "The layer's parameters must be provided as " "a list or tuple"
+        )
+    if not isinstance(variables, list) and not isinstance(variables, tuple):
+        raise ValueError("The layer's variables must be provided as " "a list or tuple")
 
     var_dict = {v.id for v in variables}
 
@@ -71,19 +73,20 @@ def CvxpyLayer(problem, parameters, variables, gp=False, custom_method=None):
     if gp:
         for param in parameters:
             if param.value is None:
-                raise ValueError("An initial value for each parameter is "
-                                 "required when gp=True.")
+                raise ValueError(
+                    "An initial value for each parameter is " "required when gp=True."
+                )
         data, solving_chain, _ = problem.get_problem_data(
-            solver=cp.SCS, gp=True, solver_opts={'use_quad_obj': False})
+            solver=cp.SCS, gp=True, solver_opts={"use_quad_obj": False}
+        )
         compiler = data[cp.settings.PARAM_PROB]
         dgp2dcp = solving_chain.get(cp.reductions.Dgp2Dcp)
         param_ids = [p.id for p in compiler.parameters]
-        old_params_to_new_params = (
-            dgp2dcp.canon_methods._parameters
-        )
+        old_params_to_new_params = dgp2dcp.canon_methods._parameters
     else:
         data, _, _ = problem.get_problem_data(
-                solver=cp.SCS, solver_opts={'use_quad_obj': False})
+            solver=cp.SCS, solver_opts={"use_quad_obj": False}
+        )
         compiler = data[cp.settings.PARAM_PROB]
         param_ids = [p.id for p in param_order]
         dgp2dcp = None
@@ -113,16 +116,17 @@ def CvxpyLayer(problem, parameters, variables, gp=False, custom_method=None):
             supplied to the constructor.
         """
         if len(params) != len(param_ids):
-            raise ValueError('An array must be provided for each CVXPY '
-                             'parameter; received %d arrays, expected %d' % (
-                                 len(params), len(param_ids)))
+            raise ValueError(
+                "An array must be provided for each CVXPY "
+                "parameter; received %d arrays, expected %d"
+                % (len(params), len(param_ids))
+            )
 
-        dtype, batch, batch_sizes, batch_size = batch_info(
-            params, param_order)
+        dtype, batch, batch_sizes, batch_size = batch_info(params, param_order)
 
         # convert to numpy arrays
         params_numpy = [np.array(param) for param in params]
-            
+
         context = ForwardContext(
             gp=gp,
             solve_and_derivative=True,
@@ -136,11 +140,11 @@ def CvxpyLayer(problem, parameters, variables, gp=False, custom_method=None):
             cone_dims=cone_dims,
             solver_args=solver_args,
             variables=variables,
-            var_dict=var_dict
+            var_dict=var_dict,
         )
 
         sol, info_forward = _forward_numpy(params_numpy, context)
-        
+
         # convert to jax arrays and store info
         sol = [jnp.array(s, dtype=dtype) for s in sol]
         info.update(info_forward)
@@ -155,8 +159,7 @@ def CvxpyLayer(problem, parameters, variables, gp=False, custom_method=None):
 
     def CvxpyLayerFn_bwd_vjp(solver_args, res, dvars):
         params, sol = res
-        dtype, batch, batch_sizes, batch_size = batch_info(
-            params, param_order)
+        dtype, batch, batch_sizes, batch_size = batch_info(params, param_order)
 
         # Use info here to retrieve this from the forward pass because
         # the residual in JAX's vjp doesn't allow non-JAX types to be
@@ -165,7 +168,7 @@ def CvxpyLayer(problem, parameters, variables, gp=False, custom_method=None):
 
         # convert to numpy arrays
         dvars_numpy = [np.array(dvar) for dvar in dvars]
-            
+
         context = BackwardContext(
             info=info,
             gp=gp,
@@ -180,9 +183,9 @@ def CvxpyLayer(problem, parameters, variables, gp=False, custom_method=None):
             old_params_to_new_params=old_params_to_new_params if gp else None,
             sol=[np.array(s) for s in sol] if gp else None,
         )
-            
+
         grad_numpy, info_backward = _backward_numpy(dvars_numpy, context)
-        
+
         # convert to jax arrays and store info
         grad = [jnp.array(g, dtype=dtype) for g in grad_numpy]
         info.update(info_backward)
@@ -193,7 +196,7 @@ def CvxpyLayer(problem, parameters, variables, gp=False, custom_method=None):
 
     # Default solver_args to an optional empty dict
     def f(*params, **kwargs):
-        solver_args = kwargs.get('solver_args', {})
+        solver_args = kwargs.get("solver_args", {})
         return CvxpyLayerFn(solver_args, *params)
 
     return f
@@ -210,8 +213,7 @@ def batch_info(params, param_order):
             raise ValueError(
                 "Two or more parameters have different dtypes. "
                 "Expected parameter %d to have dtype %s but "
-                "got dtype %s." %
-                (i, str(dtype), str(p.dtype))
+                "got dtype %s." % (i, str(dtype), str(p.dtype))
             )
 
         # check and extract the batch size for the parameter
@@ -224,13 +226,14 @@ def batch_info(params, param_order):
             if batch_size == 0:
                 raise ValueError(
                     "The batch dimension for parameter {} is zero "
-                    "but should be non-zero.".format(i))
+                    "but should be non-zero.".format(i)
+                )
         else:
             raise ValueError(
                 "Invalid parameter size passed in. Expected "
                 "parameter {} to have have {} or {} dimensions "
-                "but got {} dimensions".format(
-                    i, q.ndim, q.ndim + 1, p.ndim))
+                "but got {} dimensions".format(i, q.ndim, q.ndim + 1, p.ndim)
+            )
 
         batch_sizes.append(batch_size)
 
@@ -240,10 +243,8 @@ def batch_info(params, param_order):
             raise ValueError(
                 "Inconsistent parameter shapes passed in. "
                 "Expected parameter {} to have non-batched shape of "
-                "{} but got {}.".format(
-                        i,
-                        q.shape,
-                        p.shape))
+                "{} but got {}.".format(i, q.shape, p.shape)
+            )
 
     batch_sizes = np.array(batch_sizes)
     batch = np.any(batch_sizes > 0)
@@ -255,8 +256,8 @@ def batch_info(params, param_order):
             raise ValueError(
                 "Inconsistent batch sizes passed in. Expected "
                 "parameters to have no batch size or all the same "
-                "batch size but got sizes: {}.".format(
-                    batch_sizes))
+                "batch size but got sizes: {}.".format(batch_sizes)
+            )
     else:
         batch_size = 1
 
