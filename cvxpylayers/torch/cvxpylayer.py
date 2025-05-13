@@ -56,7 +56,7 @@ class CvxpyLayer(torch.nn.Module):
         ```
     """
 
-    def __init__(self, problem, parameters, variables, gp=False, custom_method=None):
+    def __init__(self, problem, parameters, variables, solve_method='SCS',gp=False, custom_method=None):
         """Construct a CvxpyLayer
 
         Args:
@@ -74,6 +74,8 @@ class CvxpyLayer(torch.nn.Module):
         """
         super(CvxpyLayer, self).__init__()
         
+        self.solve_method = solve_method
+
         if custom_method is None:
             self._forward_numpy, self._backward_numpy = forward_numpy, backward_numpy
         else:
@@ -158,6 +160,7 @@ class CvxpyLayer(torch.nn.Module):
             cone_dims=self.cone_dims,
             gp=self.gp,
             dgp2dcp=self.dgp2dcp,
+            solve_method=self.solve_method,
             solver_args=solver_args,
             info=info,
         )
@@ -187,6 +190,7 @@ def _CvxpyLayerFn(
         cone_dims,
         gp,
         dgp2dcp,
+        solve_method,
         solver_args,
         info):
     class _CvxpyLayerFnFn(torch.autograd.Function):
@@ -280,6 +284,7 @@ def _CvxpyLayerFn(
                 param_order=param_order,
                 old_params_to_new_params=ctx.old_params_to_new_params if gp else None,
                 cone_dims=cone_dims,
+                solve_method=solve_method,
                 solver_args=solver_args,
                 variables=variables,
                 var_dict=var_dict,

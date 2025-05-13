@@ -18,6 +18,7 @@ class ForwardContext:
     param_order: list
     old_params_to_new_params: dict
     cone_dims: list
+    solve_method: str
     solver_args: dict
     variables: list
     var_dict: dict
@@ -75,16 +76,19 @@ def forward_numpy(params_numpy, context):
     info['canon_time'] = time.time() - start
     info['shapes'] = shapes
 
+    # solver choice
+    solve_method = context.solve_method
+
     # compute solution and derivative function
     start = time.time()
     try:
         if context.solve_and_derivative:
             xs, _, _, _, DT_batch = diffcp.solve_and_derivative_batch(
-                As, bs, cs, cone_dicts, **context.solver_args)
+                As, bs, cs, cone_dicts,solve_method=solve_method, **context.solver_args)
             info['DT_batch'] = DT_batch
         else:
             xs, _, _ = diffcp.solve_only_batch(
-                As, bs, cs, cone_dicts, **context.solver_args)
+                As, bs, cs, cone_dicts, solve_method=solve_method,**context.solver_args)
     except diffcp.SolverError as e:
         print(
             "Please consider re-formulating your problem so that "
