@@ -1,0 +1,23 @@
+[project]
+name = "cvxpylayers"
+version = "0.1.9"
+description = "Differentiable convex optimization layers"
+readme = "README.md"
+requires-python = ">=3.6"
+license = { text = "Apache License, Version 2.0" }
+urls = { "Homepage" = "https://github.com/cvxgrp/cvxpylayers" }
+classifiers = [
+  "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "cvxpy>=1.6.5",
+    "numpy>=2.2.6",
+    "scipy>=1.15.3",
+]
+[dependency-groups]
+dev = [
+    "diffcp>=1.1.5",
+]
+
+[tool.uv.sources]
+diffcp = { git = "https://github.com/leo2www/diffcp-with-mosek.git" }
