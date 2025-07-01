@@ -57,6 +57,9 @@ def forward_numpy(params_numpy, context):
                 param_map[new_id] = value
         params_numpy = [param_map[pid] for pid in context.param_ids]
     
+    # HAZY LOGGER
+    print(f"\n\n utils Forward pass with params: {params_numpy}")
+
     # canonicalize problem
     start = time.time()
     As, bs, cs, cone_dicts, shapes = [], [], [], [], []

@@ -272,6 +272,10 @@ def _CvxpyLayerFn(
             
             # convert to numpy arrays
             params_numpy = [to_numpy(p) for p in params]
+            # HAZY LOGGER
+            # TODO to_numpy ignore imaginary part
+            print(f"\n\n _CvxpyLayerFnFn Forward pass with params: {params}, converted to numpy: {params_numpy}")
+
             
             context = ForwardContext(
                 gp=gp,
