@@ -7,6 +7,7 @@ from cvxpylayers.utils import (
     forward_numpy,
     backward_numpy,
 )
+import weakref
 
 try:
     import torch
@@ -77,10 +78,12 @@ class CvxpyLayer(torch.nn.Module):
                       backward pass.
         """
         super(CvxpyLayer, self).__init__()
+        # HAZY 中间变量缓冲区，将自身的弱引用传入 contex 以供存储中间变量
+        self.register_buffer('cached_context', None)
+        self.self_ref = weakref.ref(self)  # 创建实例自身的弱引用
 
         if custom_method is None:
-            self._forward_numpy, self._backward_numpy = (forward_numpy,)
-            backward_numpy
+            self._forward_numpy, self._backward_numpy = forward_numpy, backward_numpy
         else:
             self._forward_numpy, self._backward_numpy = custom_method
 
@@ -114,6 +117,7 @@ class CvxpyLayer(torch.nn.Module):
         self.var_dict = {v.id for v in self.variables}
 
         # Construct compiler
+        # TODO mosek
         self.dgp2dcp = None
 
         if self.gp:
@@ -130,6 +134,7 @@ class CvxpyLayer(torch.nn.Module):
             self.dgp2dcp = solving_chain.get(cp.reductions.Dgp2Dcp)
             self.param_ids = [p.id for p in self.compiler.parameters]
         else:
+            # TODO 这里只取data 参数格式，求解器设定被抛弃
             data, _, _ = problem.get_problem_data(
                 solver=cp.SCS, solver_opts={"use_quad_obj": False}
             )
@@ -137,6 +142,7 @@ class CvxpyLayer(torch.nn.Module):
             self.param_ids = [p.id for p in self.param_order]
         self.cone_dims = dims_to_solver_dict(data["dims"])
 
+    # 继承了torch.nn.Module，__call__隐式调用forward
     def forward(self, *params, solver_args={}):
         """Solve problem (or a batch of problems) corresponding to `params`
 
@@ -204,6 +210,7 @@ def _CvxpyLayerFn(
     info,
 ):
     class _CvxpyLayerFnFn(torch.autograd.Function):
+        # 自定义的自动微分函数
         @staticmethod
         def forward(ctx, *params):
             # infer dtype, device, and whether or not params are batched
@@ -296,6 +303,7 @@ def _CvxpyLayerFn(
                 var_dict=var_dict,
             )
 
+            # 数值计算
             sol, info_forward = _forward_numpy(params_numpy, context)
 
             # convert to torch tensors and incorporate info_forward

@@ -3,6 +3,7 @@ import diffcp
 import time
 from dataclasses import dataclass
 from typing import Any
+import weakref
 
 
 @dataclass
@@ -20,6 +21,7 @@ class ForwardContext:
     solver_args: dict
     variables: list
     var_dict: dict
+    weak_instance: weakref.ref = None  # 弱引用属性
 
 
 @dataclass
