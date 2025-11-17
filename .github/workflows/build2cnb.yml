@@ -12,6 +12,9 @@ jobs:
   build:
     name: Build wheels on ${{ matrix.os }} Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -63,9 +66,17 @@ jobs:
         if: github.ref != 'refs/heads/master'
         run: |
           BASE_VERSION="${{ steps.get_version.outputs.VERSION }}"
+          BRANCH="${{ steps.git_info.outputs.BRANCH }}"
 
-          # 对非 master 分支使用简洁的开发版号
-          NEW_VERSION="${BASE_VERSION}.dev0"
+          # 根据分支名映射不同的 dev 序号（示例映射）
+          DEV_SUFFIX=0
+          if [ "$BRANCH" = "PEP8" ]; then
+            DEV_SUFFIX=8
+          elif [ "$BRANCH" = "dev" ]; then
+            DEV_SUFFIX=1
+          fi
+
+          NEW_VERSION="${BASE_VERSION}.dev${DEV_SUFFIX}"
 
           echo "Using version: $NEW_VERSION"
 
