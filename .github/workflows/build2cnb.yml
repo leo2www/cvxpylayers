@@ -108,4 +108,4 @@ jobs:
           TWINE_REPOSITORY_URL: ${{ vars.CNB_REPOSITORY_URL_AFTER }}
         run: |
           python -m pip install twine
-          python -m twine upload dist/*
+          python -m twine upload dist/* -v
