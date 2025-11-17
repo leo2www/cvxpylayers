@@ -63,13 +63,9 @@ jobs:
         if: github.ref != 'refs/heads/master'
         run: |
           BASE_VERSION="${{ steps.get_version.outputs.VERSION }}"
-          BRANCH="${{ steps.git_info.outputs.BRANCH }}"
-          SHORT_SHA="${{ steps.git_info.outputs.SHORT_SHA }}"
 
-          # 去掉分支名中的不合法字符（示例：把 / 替成 -）
-          SAFE_BRANCH="${BRANCH//\//-}"
-
-          NEW_VERSION="${BASE_VERSION}+${SAFE_BRANCH}-${SHORT_SHA}"
+          # 对非 master 分支使用简洁的开发版号
+          NEW_VERSION="${BASE_VERSION}.dev0"
 
           echo "Using version: $NEW_VERSION"
 
@@ -81,7 +77,6 @@ jobs:
           path = pathlib.Path("pyproject.toml")
           data = path.read_text("utf-8")
 
-          # 简单替换 [project] 下的 version 字段
           new_version = os.environ["NEW_VERSION"]
           pattern = r'(?m)^(version\s*=\s*")([^"]*)(")'
           repl = r'\g<1>' + new_version + r'\g<3>'
