@@ -102,14 +102,10 @@ jobs:
           path: dist/
 
       - name: Upload wheel to cnb Packages
-        run: |
-          python -m pip install twine
-          python -m twine upload \
-            --repository-url https://${TWINE_USERNAME}:${TWINE_PASSWORD}@${CNB_URL} \
-            dist/*
         env:
           TWINE_USERNAME: ${{ vars.CNB_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.CNB_TOKEN }}
-          CNB_URL: ${{ vars.CNB_REPOSITORY_URL_AFTER }}
-
-
+          TWINE_REPOSITORY_URL: ${{ vars.CNB_REPOSITORY_URL_AFTER }}
+        run: |
+          python -m pip install twine
+          python -m twine upload dist/*
