@@ -73,7 +73,7 @@ jobs:
 
           echo "Using version: $NEW_VERSION"
 
-          python - << 'PYCODE'
+          NEW_VERSION="$NEW_VERSION" python - << 'PYCODE'
           import pathlib
 
           path = pathlib.Path("pyproject.toml")
@@ -81,7 +81,7 @@ jobs:
           import re
 
           # 简单替换 [project] 下的 version 字段
-          new_version = "${NEW_VERSION}"
+          new_version = os.environ["NEW_VERSION"]
           pattern = r'(?m)^(version\s*=\s*")[^"]*(")'
           repl = r'\1' + new_version + r'\2'
           new_data, n = re.subn(pattern, repl, data)
@@ -89,8 +89,6 @@ jobs:
               raise SystemExit("No version= found to replace in pyproject.toml")
           path.write_text(new_data, "utf-8")
           PYCODE
-        env:
-          NEW_VERSION: ${{ env.NEW_VERSION }}
 
       - name: Build wheel
         run: |
