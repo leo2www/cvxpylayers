@@ -1,0 +1,106 @@
+name: Build and Upload Wheels to GitHub Packages
+
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build wheels on ${{ matrix.os }} Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Get version from pyproject.toml
+        id: get_version
+        run: |
+          VERSION=$(python -c "import tomllib, pathlib; d=tomllib.loads(pathlib.Path('pyproject.toml').read_text('utf-8')); print(d['project']['version'])")
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Get branch and short SHA
+        id: git_info
+        run: |
+          REF_NAME="${GITHUB_REF_NAME}"
+          SHORT_SHA="${GITHUB_SHA::5}"
+          echo "BRANCH=$REF_NAME" >> "$GITHUB_OUTPUT"
+          echo "SHORT_SHA=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+
+      # - name: Install runtime deps needed at build time
+      #   run: |
+      #     python -m pip install numpy scipy diffcp cvxpy
+      
+      - name: Bump version for non-master branches
+        if: github.ref != 'refs/heads/master'
+        run: |
+          BASE_VERSION="${{ steps.get_version.outputs.VERSION }}"
+          BRANCH="${{ steps.git_info.outputs.BRANCH }}"
+          SHORT_SHA="${{ steps.git_info.outputs.SHORT_SHA }}"
+
+          # 去掉分支名中的不合法字符（示例：把 / 替成 -）
+          SAFE_BRANCH="${BRANCH//\//-}"
+
+          NEW_VERSION="${BASE_VERSION}+${SAFE_BRANCH}-${SHORT_SHA}"
+
+          echo "Using version: $NEW_VERSION"
+
+          python - << 'PYCODE'
+          import pathlib, tomllib
+
+          path = pathlib.Path("pyproject.toml")
+          data = path.read_text("utf-8")
+          import re
+
+          # 简单替换 [project] 下的 version 字段
+          new_version = "${NEW_VERSION}"
+          pattern = r'(?m)^(version\s*=\s*")[^"]*(")'
+          repl = r'\1' + new_version + r'\2'
+          new_data, n = re.subn(pattern, repl, data)
+          if n == 0:
+              raise SystemExit("No version= found to replace in pyproject.toml")
+          path.write_text(new_data, "utf-8")
+          PYCODE
+        env:
+          NEW_VERSION: ${{ env.NEW_VERSION }}
+
+      - name: Build wheel
+        run: |
+          python -m build
+
+      - name: Upload wheel as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ github.ref }}-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: dist/
+
+      - name: Upload wheel to cnb Packages
+        run: |
+          python -m pip install twine
+          python -m twine upload \
+            --repository-url https://${TWINE_USERNAME}:${TWINE_PASSWORD}@${CNB_URL} \
+            dist/*
+        env:
+          TWINE_USERNAME: ${{ vars.CNB_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.CNB_TOKEN }}
+          CNB_URL: ${{ vars.CNB_REPOSITORY_URL_AFTER }}
+
+
